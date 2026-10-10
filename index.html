@@ -12,6 +12,7 @@
   <meta property="og:description" content="Cybersecurity, integration, AV/VTC and program support for federal and private-sector clients. Family-owned. Arlington, Virginia.">
   <meta name="twitter:card" content="summary">
   <link rel="preload" href="/fonts/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" as="image" type="image/avif" href="/motion/video/hero-poster-mobile-1080x1920.avif" media="(max-width: 900px), (orientation: portrait)" fetchpriority="high">
   <link rel="icon" href="/brand/cyberking-mark.svg" type="image/svg+xml">
   <script>
     // Tier decision before first paint (kept inline + tiny). main.js reads data-tier.
@@ -83,6 +84,12 @@
         <div class="ckm-poster" id="heroPoster" aria-hidden="true">
   <div class="ckm-poster__mark"><svg class="ckm-poster__svg" viewBox="48 6 186 180" overflow="visible" aria-hidden="true"><g class="ckm-guides" stroke="rgb(160,174,196)" stroke-opacity=".16" stroke-width="1"><line class="ckm-guide" vector-effect="non-scaling-stroke" x1="-847.6" y1="26.4" x2="1130.0" y2="26.4"/><line class="ckm-guide" vector-effect="non-scaling-stroke" x1="679.2" y1="-753.5" x2="-308.2" y2="960.7"/><line class="ckm-guide" vector-effect="non-scaling-stroke" x1="588.8" y1="961.5" x2="-395.5" y2="-754.3"/></g><path fill="#e92830" d="M135.53,10.35 L194.13,10.35 L108.15,59.99 L108.15,125.4 L77.85,72.92 L77.85,43.65Z"/><path fill="#e92830" d="M110.85,130.08 L110.85,62.59 L172.3,27.09 L201.22,43.29 L140.15,78.13 L140.15,180.83Z"/><path fill="#e92830" d="M172.85,62.33 L201.15,45.99 L201.15,78.12 L172.85,127.13Z"/><path fill="#1aaae4" d="M52.38,26.35 L103.62,26.35 L78,41.15Z"/><path fill="#1aaae4" d="M52.74,29.44 L76.15,42.86 L76.15,69.98Z"/><path fill="#1aaae4" d="M175.84,26.35 L229.98,26.35 L203.41,42Z"/><path fill="#1aaae4" d="M228.8,30.23 L203.85,44.57 L203.85,73.44Z"/><path fill="#1aaae4" d="M142.85,179.1 L142.85,79.53 L170.15,63.77 L170.15,131.81Z"/></svg></div>
 </div>
+        <!-- Phones: the engineer's portrait poster (frame 0 of the portrait cut) is the first paint / LCP. Desktop gets a 1px no-op. -->
+        <picture class="hero__pic" aria-hidden="true">
+          <source media="(max-width: 900px), (orientation: portrait)" type="image/avif" srcset="/motion/video/hero-poster-mobile-1080x1920.avif">
+          <source media="(max-width: 900px), (orientation: portrait)" type="image/jpeg" srcset="/motion/video/hero-poster-mobile-1080x1920.jpg">
+          <img class="hero__pimg" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" aria-hidden="true" role="presentation" width="1080" height="1920" fetchpriority="high" decoding="async">
+        </picture>
         <canvas class="hero__gl" id="heroCanvas"></canvas>
         <!-- Hero video slot: filled from /motion/video/video-manifest.json when renders exist; crossfades to the live scene on scroll. -->
         <video class="hero__video" id="heroVideo" muted playsinline loop preload="none" disablepictureinpicture tabindex="-1" hidden></video>

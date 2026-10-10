@@ -27,6 +27,14 @@ import { CHAPTERS, LIGHT, chapterBus } from "./ui/chapters.js";
 const root = document.documentElement;
 let tier = root.dataset.tier || "full";
 const isMobile = matchMedia("(max-width: 960px), (pointer: coarse)").matches;
+// Phones (≤900px or portrait): poster + portrait cut first; GSAP and WebGL wait for the first scroll/interaction.
+const isPhone = matchMedia("(max-width: 900px), (orientation: portrait)").matches;
+function onFirstInteraction(fn) {
+  const evs = ["scroll", "wheel", "touchstart", "pointerdown", "keydown"];
+  let done = false;
+  const go = () => { if (done) return; done = true; evs.forEach((e) => removeEventListener(e, go, true)); fn(); };
+  evs.forEach((e) => addEventListener(e, go, { passive: true, capture: true }));
+}
 
 initUI();
 initForm();
@@ -37,8 +45,11 @@ initRail(document.getElementById("rail"));
 if (tier !== "static") {
   // Choreography is below-the-fold work: wire it after load + idle so it stays out of the LCP/TBT window.
   const startChoreo = () => import("./ui/choreo.js").then((m) => m.initChoreo({ tier, isMobile }));
-  if (document.readyState === "complete") ("requestIdleCallback" in window ? requestIdleCallback(startChoreo, { timeout: 800 }) : setTimeout(startChoreo, 0));
-  else addEventListener("load", () => ("requestIdleCallback" in window ? requestIdleCallback(startChoreo, { timeout: 800 }) : setTimeout(startChoreo, 0)), { once: true });
+  const choreoWhenIdle = () => (document.readyState === "complete"
+    ? ("requestIdleCallback" in window ? requestIdleCallback(startChoreo, { timeout: 800 }) : setTimeout(startChoreo, 0))
+    : addEventListener("load", () => ("requestIdleCallback" in window ? requestIdleCallback(startChoreo, { timeout: 800 }) : setTimeout(startChoreo, 0)), { once: true }));
+  // ScrollTrigger registration stays deferred; on phones it also waits for the first interaction (no ticker before).
+  if (isPhone) onFirstInteraction(choreoWhenIdle); else choreoWhenIdle();
 } else {
   // Static: chapter tracking without scroll scrubbing.
   import("./ui/chapters-static.js").then((m) => m.trackChapters());
@@ -160,18 +171,17 @@ function frameVideo(meta, x0, x1, y0, y1, maxW) {
 }
 
 function computeBox(w, h) {
-  if (w <= 900) {
+  if (w <= 900 || h > w) {
     const mw = Math.min(0.76 * w, 440), mh = (mw * 180) / 186;
-    if (VMETA_MOBILE && h > w) {
-      // Portrait cut: union of the mark fills the slot above the eyebrow.
-      const st = stageEl.getBoundingClientRect();
-      const eb = heroEl.querySelector(".hero__eyebrow");
-      const yMax = (eb ? untransformedTop(eb, st) : 92 + mh) - 34;
-      const fr = frameVideo(VMETA_MOBILE, (w - mw) / 2, (w + mw) / 2, 92, Math.max(92 + mh * 0.6, yMax), mw);
-      // Phones: keep the cut full-bleed horizontally (no side fades), shifting the whole composition if needed.
-      const dx = fr.V.w >= w ? Math.min(0, Math.max(w - fr.V.w, fr.V.x)) - fr.V.x : (w - fr.V.w) / 2 - fr.V.x;
-      fr.V.x += dx; fr.M.x += dx; fr.cx += dx;
-      return { mobile: true, w, h, ...fr };
+    if (VMETA_MOBILE) {
+      // Portrait cut shown full-bleed (object-fit: cover, same as the poster image), so nothing moves after first paint.
+      const [fw, fh] = VMETA_MOBILE.size, sc = Math.max(w / fw, h / fh), Vw = fw * sc, Vh = fh * sc;
+      const vx = (w - Vw) / 2, vy = (h - Vh) / 2, u = VMETA_MOBILE.union, f = VMETA_MOBILE.f0;
+      return {
+        mobile: true, w, h,
+        M: { x: vx + u[0] * Vw, y: vy + u[1] * Vh, w: (u[2] - u[0]) * Vw, h: (u[3] - u[1]) * Vh },
+        markPx: (f[2] - f[0]) * Vw, cx: vx + ((f[0] + f[2]) / 2) * Vw, cy: vy + ((f[1] + f[3]) / 2) * Vh,
+      };
     }
     // Mobile without a portrait cut: the motion package default (mark centred above the copy).
     const cy = 64 + 28 + mh / 2;
@@ -253,26 +263,41 @@ function heroLayout(w, h) {
   return { markPx: b.markPx, focus0: [b.cx / w, b.cy / h], focus1: [zx / w, 0.5], frac: Math.min(0.46, ((b.zone.x1 - b.zone.x0) / w) * 0.95) };
 }
 
-async function startExternal() {
-  // Their init() is synchronous and defers its own heavy loading until after first paint + idle.
-  const [H, B] = await Promise.all([import("./motion/hero.js"), import("./motion/background.js")]);
+async function startBackground() {
+  if (bg) return;
+  const B = await import("./motion/background.js");
   const bgCanvas = document.getElementById("bg");
-  bg = B.init(bgCanvas, { initialChapter: chapterBus.current });
+  bg = B.init(bgCanvas, { initialChapter: chapterBus.current, ...(isPhone ? { tier: "low" } : {}) });
   bg.kind = "external";
   bgCanvas.classList.add("is-on");
   root.classList.add("bg-live");
+}
+
+async function startHero() {
+  if (hero) return;
+  const H = await import("./motion/hero.js");
   hero = H.init(document.getElementById("heroCanvas"), {
     poster: document.getElementById("heroPoster"),
     trigger: heroEl,
     scrollStart: "top top",
     scrollEnd: "bottom bottom",
     layout: heroLayout,
-    onFirstFrame: () => heroEl.classList.add("gl-on"),
+    ...(isPhone ? { tier: "low" } : {}),
+    onFirstFrame: () => { heroEl.classList.add("gl-on"); if (syncSceneRef) syncSceneRef(); },
   });
   hero.setChapter(chapterBus.current);
   heroEl.classList.add("ext-motion");
   window.__ckMotionCtl = { hero, bg };
+  if (syncSceneRef) syncSceneRef();
 }
+
+function startExternal() {
+  if (!isPhone) { startBackground(); startHero(); return; }
+  // Phones: nothing WebGL/GSAP-driven until the visitor scrolls or touches; then the low tier only.
+  // The hero scene starts right away on that interaction; the living background after the next idle period.
+  onFirstInteraction(() => { startHero(); idle(() => startBackground()); });
+}
+let syncSceneRef = null;
 
 // ---------- Hero video slot (renders from the motion engineer, if delivered) ----------
 // Labels appear only once the layout has settled (fonts + clip metadata), so they never visibly jump (CLS).
@@ -285,9 +310,9 @@ async function initHeroVideoInner() {
   let man;
   try { const r = await fetch("/motion/video/video-manifest.json", { cache: "no-store" }); if (!r.ok) return; man = await r.json(); } catch (_) { return; }
   if (!man.videos || !man.videos.length) return;
-  const portrait = innerHeight > innerWidth;
+  const portrait = isPhone; // same rule as motion/video-snippet.html: ≤900px (or portrait) → mobile cut
   const saveData = navigator.connection && navigator.connection.saveData;
-  const want = portrait ? 0 : innerWidth * Math.min(devicePixelRatio || 1, 2) > 2400 ? 2160 : 1080;
+  const want = portrait ? 0 : innerWidth >= 2400 ? 2160 : 1080; // ≥2400 CSS px → 4K, otherwise 1080p
   let pool = man.videos.filter((v) => v.mobile === portrait);
   // No portrait encode yet: don't ship a 10 MB landscape film to phones; the live scene covers the hero.
   if (!pool.length && portrait) return;
@@ -310,11 +335,13 @@ async function initHeroVideoInner() {
   video.hidden = false;
   if (saveData) { video.hidden = true; return; } // save-data: keep the SVG poster + live scene, no download
   video.preload = "auto";
-  const syncScene = () => {
+  const syncScene = syncSceneRef = () => {
     // The live scene is invisible under the playing clip: pause it to save CPU/GPU; resume for the crossfade.
     if (!hero) return;
     const showing = heroEl.classList.contains("video-on") && !heroEl.classList.contains("is-live");
     try { showing ? hero.pause && hero.pause() : hero.resume && hero.resume(); } catch (_) {}
+    // Once the live scene is up and the visitor has scrolled, the film is hidden: stop decoding it.
+    if (heroEl.classList.contains("is-live") && heroEl.classList.contains("gl-on") && !video.paused) setTimeout(() => { if (scrollY > 24) video.pause(); }, 700);
   };
   video.addEventListener("playing", () => { heroEl.classList.add("video-on"); syncScene(); }, { once: true });
   video.play().catch(() => {}); // autoplay refused: stay on the SVG poster / live scene
@@ -323,8 +350,7 @@ async function initHeroVideoInner() {
     const live = scrollY > 24;
     heroEl.classList.toggle("is-live", live);
     syncScene();
-    if (live && !video.paused) video.pause();
-    else if (!live && video.paused && !saveData) video.play().catch(() => {});
+    if (!live && video.paused && !saveData) video.play().catch(() => {});
   };
   addEventListener("scroll", onScroll, { passive: true });
   onScroll();
