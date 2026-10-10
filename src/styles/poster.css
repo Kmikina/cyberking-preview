@@ -1,0 +1,13 @@
+/* Hero poster (LCP-safe, no JS). Sits under/over the hero canvas and is
+   faded out by hero.js after the first WebGL frame (pass it as opts.poster).
+   Geometry = original .hero__mark rules, in container units of the hero stage,
+   so it lines up with the first WebGL frame (src/core/layout.js). */
+.ckm-poster{position:absolute;inset:0;overflow:hidden;background:#07090d;container-type:size;pointer-events:none}
+.ckm-poster__mark{position:absolute;aspect-ratio:186/180;
+  width:min(50cqw,820px,70cqh);
+  right:max(24px,calc((100cqw - 1440px) / 2 - 2cqw));
+  top:50%;transform:translateY(-54%)}
+.ckm-poster__svg{display:block;width:100%;height:100%;overflow:visible}
+@container (max-width: 900px){
+  .ckm-poster__mark{width:min(76cqw,440px);right:auto;left:50%;top:92px;transform:translateX(-50%)}
+}
