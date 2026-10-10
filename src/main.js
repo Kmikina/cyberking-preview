@@ -112,8 +112,8 @@ async function startStandin() {
  */
 // Mark bounds inside the clip (0..1 of the frame). Defaults = hero-loop-1920x1080 v1; the build measures every clip and
 // writes markUnion/markF0 into video-manifest.json, which replaces these once the manifest is read (setVideoMeta).
-let VMETA = { union: [0.462, 0.133, 0.91, 0.889], f0: [0.512, 0.152, 0.883, 0.785], size: [1920, 1080] };
-let VMETA_MOBILE = null; // only set when a portrait cut exists
+let VMETA = (typeof __CK_VMETA__ !== "undefined" && __CK_VMETA__) || { union: [0.462, 0.133, 0.91, 0.889], f0: [0.512, 0.152, 0.883, 0.785], size: [1920, 1080] };
+let VMETA_MOBILE = (typeof __CK_VMETA_MOBILE__ !== "undefined" && __CK_VMETA_MOBILE__) || null; // only set when a portrait cut exists
 function setVideoMeta(v) {
   if (!v || !v.markUnion || !v.markF0) return;
   const m = { union: v.markUnion, f0: v.markF0, size: v.size || [1920, 1080] };
@@ -161,6 +161,9 @@ function computeBox(w, h) {
       const eb = heroEl.querySelector(".hero__eyebrow");
       const yMax = (eb ? eb.getBoundingClientRect().top - st.top : 92 + mh) - 34;
       const fr = frameVideo(VMETA_MOBILE, (w - mw) / 2, (w + mw) / 2, 92, Math.max(92 + mh * 0.6, yMax), mw);
+      // Phones: keep the cut full-bleed horizontally (no side fades), shifting the whole composition if needed.
+      const dx = fr.V.w >= w ? Math.min(0, Math.max(w - fr.V.w, fr.V.x)) - fr.V.x : (w - fr.V.w) / 2 - fr.V.x;
+      fr.V.x += dx; fr.M.x += dx; fr.cx += dx;
       return { mobile: true, w, h, ...fr };
     }
     // Mobile without a portrait cut: the motion package default (mark centred above the copy).
@@ -175,6 +178,20 @@ function computeBox(w, h) {
   const y0 = (nav ? nav.offsetHeight : 72) + 44; // room for the C / I labels
   const stripTop = strip ? strip.getBoundingClientRect().top - st.top : h - 96;
   const y1 = Math.min(h, stripTop) - 40; // room for the A label
+  // Preferred: the clip full-bleed (object-fit: cover), if its mark already stays clear of the copy column.
+  {
+    const [fw, fh] = VMETA.size, sc = Math.max(w / fw, h / fh), Vw = fw * sc, Vh = fh * sc;
+    const vx = (w - Vw) / 2, vy = (h - Vh) / 2, u = VMETA.union, f = VMETA.f0;
+    const ux0 = vx + u[0] * Vw, ux1 = vx + u[2] * Vw, uy0 = vy + u[1] * Vh, uy1 = vy + u[3] * Vh;
+    if (ux0 >= x0 + 0.03 * w && ux1 <= w - 24 && uy0 >= y0 - 20) {
+      return {
+        mobile: false, cover: true, w, h, zone: { x0: ux0, x1: ux1 },
+        M: { x: ux0, y: uy0, w: ux1 - ux0, h: Math.min(uy1, h) - uy0 }, V: { x: vx, y: vy, w: Vw, h: Vh },
+        markPx: (f[2] - f[0]) * Vw, cx: vx + ((f[0] + f[2]) / 2) * Vw, cy: vy + ((f[1] + f[3]) / 2) * Vh,
+      };
+    }
+  }
+  // Otherwise scale the clip down so the mark's full range of motion fits between the copy and the right gutter.
   return { mobile: false, w, h, zone: { x0, x1 }, ...frameVideo(VMETA, x0, x1, y0, y1, 0.92 * h) };
 }
 
@@ -197,18 +214,25 @@ function applyBox(b) {
   heroEl.classList.add("has-layout");
   heroEl.classList.toggle("is-mobile-layout", b.mobile);
   heroEl.classList.toggle("has-vframe", !!b.V);
+  heroEl.classList.toggle("v-cover", !!b.cover);
+  heroEl.classList.toggle("annot-side", !!b.cover && b.M.y + b.M.h > b.h - 64);
 }
 
 function relayout() {
   const r = stageEl.getBoundingClientRect();
   applyBox(computeBox(r.width, r.height));
 }
-relayout();
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { relayout(); if (hero && hero.resize) hero.resize(); });
+// Measure once the display face is in (it is preloaded), so the mark is placed once and never shifts (CLS).
+// Until then the poster mark is hidden by CSS (.hero:not(.has-layout)).
+let laidOut = false;
+const firstLayout = () => { if (laidOut) return; laidOut = true; relayout(); if (hero && hero.resize) hero.resize(); };
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(firstLayout);
+setTimeout(firstLayout, 1200);
 let rlT = 0;
 addEventListener("resize", () => { cancelAnimationFrame(rlT); rlT = requestAnimationFrame(relayout); });
 
 function heroLayout(w, h) {
+  if (!lastBox) relayout();
   const b = lastBox && Math.abs(lastBox.w - w) < 2 && Math.abs(lastBox.h - h) < 2 ? lastBox : computeBox(w, h);
   if (b.mobile) return { markPx: b.markPx, focus0: [b.cx / w, b.cy / h], focus1: [0.5, 0.33], frac: 0.92 };
   // Risen fortress stays inside the same right-hand zone, so it never crosses the copy while the copy is visible.
@@ -238,6 +262,35 @@ async function startExternal() {
 }
 
 // ---------- Hero video slot (renders from the motion engineer, if delivered) ----------
+/**
+ * Phones: paint the portrait cut through a <canvas> (same box, same fades) and keep the <video> element itself as a
+ * tiny, near-transparent decoder. Reason: Chrome counts a playing <video> as an LCP candidate, so a clip that fades in
+ * at ~2-4 s on a throttled phone would replace the hero text (already painted at ~1-2 s) as the LCP element even though
+ * the SVG poster showing the same frame was there from first paint. Desktop keeps the plain <video>.
+ */
+function blitToCanvas(video) {
+  const cv = document.createElement("canvas");
+  cv.className = "hero__video hero__video--canvas";
+  cv.setAttribute("aria-hidden", "true");
+  video.after(cv);
+  video.classList.add("hero__video--decoder");
+  const ctx = cv.getContext("2d", { alpha: false });
+  const size = () => {
+    const r = cv.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 1.5);
+    cv.width = Math.max(2, Math.round(r.width * d)); cv.height = Math.max(2, Math.round(r.height * d));
+  };
+  size();
+  addEventListener("resize", size);
+  let raf = 0, lastT = -1;
+  const draw = () => {
+    raf = 0;
+    if (video.readyState >= 2 && video.currentTime !== lastT) { lastT = video.currentTime; ctx.drawImage(video, 0, 0, cv.width, cv.height); }
+    if (!video.paused) raf = requestAnimationFrame(draw);
+  };
+  video.addEventListener("play", () => { if (!raf) raf = requestAnimationFrame(draw); });
+  video.addEventListener("seeked", () => { if (!raf) raf = requestAnimationFrame(draw); });
+}
+
 async function initHeroVideo() {
   const video = document.getElementById("heroVideo");
   if (!video || tier !== "full" || /[?&]video=0/.test(location.search)) return; // reduced motion: poster only, never autoplay
@@ -253,18 +306,25 @@ async function initHeroVideo() {
   if (!pool.length) pool = man.videos;
   pool.sort((a, b) => Math.abs(a.res - want) - Math.abs(b.res - want) || (a.type === "video/webm" ? -1 : 1));
   const poster = (man.posters.find((p) => p.mobile === portrait) || man.posters[0] || {}).src;
-  if (poster) video.poster = poster;
+  // No poster attribute: the inline SVG poster underneath already matches frame 0, and a late poster image would
+  // become a new (late) LCP candidate. The clip fades in only once it is actually playing.
+  void poster;
   // Prefer the closest resolution; offer webm + mp4 of that resolution.
   const best = pool.filter((v) => v.res === pool[0].res);
-  setVideoMeta(best.find((v) => v.markUnion) || best[0]);
+  const measured = best.filter((v) => v.markUnion && v.markF0);
+  if (measured.length) {
+    const u = measured.reduce((a, v) => [Math.min(a[0], v.markUnion[0]), Math.min(a[1], v.markUnion[1]), Math.max(a[2], v.markUnion[2]), Math.max(a[3], v.markUnion[3])], [1, 1, 0, 0]);
+    setVideoMeta({ ...measured[0], markUnion: u });
+  }
   relayout();
   if (hero && hero.resize) hero.resize();
   best.forEach((v) => { const so = document.createElement("source"); so.src = v.src; so.type = v.type; video.appendChild(so); });
   video.hidden = false;
-  if (saveData) { heroEl.classList.add("video-on"); return; } // poster frame only
+  if (saveData) { video.hidden = true; return; } // save-data: keep the SVG poster + live scene, no download
   video.preload = "auto";
+  if (portrait) blitToCanvas(video);
   video.addEventListener("playing", () => heroEl.classList.add("video-on"), { once: true });
-  video.play().catch(() => heroEl.classList.add("video-on"));
+  video.play().catch(() => {}); // autoplay refused: stay on the SVG poster / live scene
   // Crossfade into the live scroll scene as soon as scrolling starts; return to the film at the very top.
   const onScroll = () => {
     const live = scrollY > 24;

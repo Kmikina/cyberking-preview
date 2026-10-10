@@ -64,10 +64,29 @@ function heroVideo() {
   };
 }
 
+// Bake the desktop clip's measured mark bounds into the bundle so the first layout already matches the clip (no CLS).
+function bakedVideoMeta(mobile) {
+  try {
+    const isMob = (n) => /mobile|portrait|vert|9x16/i.test(n);
+    const files = fs.readdirSync(VIDEO_DIR).filter((n) => /\.(mp4|webm)$/i.test(n) && isMob(n) === mobile).sort((a, b) => (/1080/.test(a) ? -1 : 1));
+    let out = null;
+    for (const f of files) {
+      if (!mobile && out) break; // desktop: the 1080 clip is representative
+      const m = JSON.parse(execFileSync("python3", [path.resolve(__dirname, "scripts/measure-mark.py"), path.join(VIDEO_DIR, f)], { encoding: "utf8" }));
+      if (!m || !m.union) continue;
+      // union across encodes of the same cut, so either source fits the same box
+      out = out ? { ...out, union: [Math.min(out.union[0], m.union[0]), Math.min(out.union[1], m.union[1]), Math.max(out.union[2], m.union[2]), Math.max(out.union[3], m.union[3])] } : { union: m.union, f0: m.f0, size: [m.w, m.h] };
+    }
+    return out;
+  } catch (_) { return null; }
+}
+const VMETA = bakedVideoMeta(false);
+const VMETA_MOBILE = bakedVideoMeta(true);
+
 console.log(`[cyberking] motion modules: ${motion.kind} (${motion.hero})`);
 
 export default defineConfig({
-  define: { __CK_MOTION__: JSON.stringify(motion.kind) },
+  define: { __CK_MOTION__: JSON.stringify(motion.kind), __CK_VMETA__: JSON.stringify(VMETA), __CK_VMETA_MOBILE__: JSON.stringify(VMETA_MOBILE) },
   resolve: {
     alias: { "@ck/motion-hero": motion.hero, "@ck/motion-bg": motion.bg },
     dedupe: ["three", "gsap"],
