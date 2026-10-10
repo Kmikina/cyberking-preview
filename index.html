@@ -11,9 +11,9 @@
   <meta property="og:title" content="Cyber King Services — Secure the systems your mission runs on">
   <meta property="og:description" content="Cybersecurity, integration, AV/VTC and program support for federal and private-sector clients. Family-owned. Arlington, Virginia.">
   <meta name="twitter:card" content="summary">
-  <link rel="preload" href="/fonts/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" as="image" type="image/avif" href="/motion/video/hero-poster-mobile-1080x1920.avif" media="(max-width: 900px), (orientation: portrait)" fetchpriority="high">
-  <link rel="icon" href="/brand/cyberking-mark.svg" type="image/svg+xml">
+  <link rel="preload" href="%BASE_URL%fonts/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" as="image" type="image/avif" href="%BASE_URL%motion/video/hero-poster-mobile-1080x1920.avif" media="(max-width: 900px), (orientation: portrait)" fetchpriority="high">
+  <link rel="icon" href="%BASE_URL%brand/cyberking-mark.svg" type="image/svg+xml">
   <script>
     // Tier decision before first paint (kept inline + tiny). main.js reads data-tier.
     (function(d){var h=d.documentElement,n=navigator,t="full";h.classList.remove("no-js");h.classList.add("js");
@@ -33,7 +33,7 @@
 
   <header class="nav" id="nav">
     <a class="nav__brand" href="#top" aria-label="Cyber King Services — home">
-      <img src="/brand/cyberking-mark.svg" alt="" width="34" height="33">
+      <img src="%BASE_URL%brand/cyberking-mark.svg" alt="" width="34" height="33">
       <span class="nav__name">Cyber King <span>Services</span></span>
     </a>
     <nav class="nav__links" aria-label="Primary">
@@ -86,8 +86,8 @@
 </div>
         <!-- Phones: the engineer's portrait poster (frame 0 of the portrait cut) is the first paint / LCP. Desktop gets a 1px no-op. -->
         <picture class="hero__pic" aria-hidden="true">
-          <source media="(max-width: 900px), (orientation: portrait)" type="image/avif" srcset="/motion/video/hero-poster-mobile-1080x1920.avif">
-          <source media="(max-width: 900px), (orientation: portrait)" type="image/jpeg" srcset="/motion/video/hero-poster-mobile-1080x1920.jpg">
+          <source media="(max-width: 900px), (orientation: portrait)" type="image/avif" srcset="%BASE_URL%motion/video/hero-poster-mobile-1080x1920.avif">
+          <source media="(max-width: 900px), (orientation: portrait)" type="image/jpeg" srcset="%BASE_URL%motion/video/hero-poster-mobile-1080x1920.jpg">
           <img class="hero__pimg" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" aria-hidden="true" role="presentation" width="1080" height="1920" fetchpriority="high" decoding="async">
         </picture>
         <canvas class="hero__gl" id="heroCanvas"></canvas>
@@ -404,7 +404,7 @@
 
   <footer class="foot">
     <div class="wrap foot__inner">
-      <img class="foot__logo" src="/brand/cyberking-logo.svg" alt="Cyber King Services" width="152" height="201" loading="lazy">
+      <img class="foot__logo" src="%BASE_URL%brand/cyberking-logo.svg" alt="Cyber King Services" width="152" height="201" loading="lazy">
       <div class="foot__cols">
         <nav aria-label="Footer">
           <a href="#company">Company</a>

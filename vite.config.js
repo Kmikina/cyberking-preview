@@ -3,15 +3,19 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
-const EXT = path.resolve(__dirname, "../motion");
-const VIDEO_DIR = path.resolve(EXT, "video");
+// Self-contained: the motion engineer's modules are vendored in ./vendor/motion, the rendered clips in ./media/video.
+const EXT = path.resolve(__dirname, "vendor/motion");
+const VIDEO_DIR = path.resolve(__dirname, "media/video");
+// CK_DEPLOY=1 → GitHub Pages build: served under /cyberking-preview/ and marked noindex.
+const DEPLOY = process.env.CK_DEPLOY === "1";
+const BASE = DEPLOY ? "/cyberking-preview/" : "/";
 const useExternal = process.env.CK_MOTION !== "standin" && fs.existsSync(path.join(EXT, "src/hero.js"));
 const motion = useExternal
   ? { hero: path.join(EXT, "src/hero.js"), bg: path.join(EXT, "src/background.js"), kind: "external" }
   : { hero: path.resolve(__dirname, "src/motion/standin/hero.js"), bg: path.resolve(__dirname, "src/motion/standin/background.js"), kind: "standin" };
 
 /**
- * Hero video slot: if the motion engineer's renders exist in ../motion/video/, copy them into the build at
+ * Hero video slot: if the motion engineer's renders exist in ./media/video/, copy them into the build at
  * /motion/video/ and emit video-manifest.json classifying them (4k / 1080 / mobile / poster, mp4 / webm).
  */
 function heroVideo() {
@@ -38,7 +42,7 @@ function heroVideo() {
   };
   const list = () => (fs.existsSync(VIDEO_DIR) ? fs.readdirSync(VIDEO_DIR).filter((f) => fs.statSync(path.join(VIDEO_DIR, f)).isFile()) : []);
   const manifest = () => {
-    const files = list().map((f) => ({ src: "/motion/video/" + f, ...classify(f) })).filter((x) => x.kind);
+    const files = list().map((f) => ({ src: BASE + "motion/video/" + f, ...classify(f) })).filter((x) => x.kind);
     for (let i = files.length - 1; i >= 0; i--) if (files[i].kind === "video" && !measure(path.basename(files[i].src))) { console.warn("[cyberking] skipping unreadable clip", files[i].src); files.splice(i, 1); }
     files.forEach((x) => { if (x.kind === "video") { const m = measure(path.basename(x.src)); if (m) { x.size = [m.w, m.h]; x.mobile = x.mobile || m.h > m.w; x.markUnion = m.union; x.markF0 = m.f0; } } });
     return { generated: new Date().toISOString(), videos: files.filter((f) => f.kind === "video"), posters: files.filter((f) => f.kind === "poster") };
@@ -47,13 +51,16 @@ function heroVideo() {
     name: "ck-hero-video",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (req.url === "/motion/video/video-manifest.json") { res.setHeader("content-type", "application/json"); return res.end(JSON.stringify(manifest())); }
-        if (req.url && req.url.startsWith("/motion/video/")) {
-          const f = path.join(VIDEO_DIR, decodeURIComponent(req.url.slice(14).split("?")[0]));
+        if (req.url === BASE + "motion/video/video-manifest.json") { res.setHeader("content-type", "application/json"); return res.end(JSON.stringify(manifest())); }
+        if (req.url && req.url.startsWith(BASE + "motion/video/")) {
+          const f = path.join(VIDEO_DIR, decodeURIComponent(req.url.slice((BASE + "motion/video/").length).split("?")[0]));
           if (f.startsWith(VIDEO_DIR) && fs.existsSync(f)) return fs.createReadStream(f).pipe(res);
         }
         next();
       });
+    },
+    transformIndexHtml(html) {
+      return DEPLOY ? html.replace("<meta charset=\"utf-8\">", "<meta charset=\"utf-8\">\n  <meta name=\"robots\" content=\"noindex,nofollow\">") : html;
     },
     generateBundle() {
       const keep = new Set(manifest().videos.concat(manifest().posters).map((x) => path.basename(x.src)));
@@ -88,6 +95,7 @@ const VMETA_MOBILE = bakedVideoMeta(true);
 console.log(`[cyberking] motion modules: ${motion.kind} (${motion.hero})`);
 
 export default defineConfig({
+  base: BASE,
   define: { __CK_MOTION__: JSON.stringify(motion.kind), __CK_VMETA__: JSON.stringify(VMETA), __CK_VMETA_MOBILE__: JSON.stringify(VMETA_MOBILE) },
   resolve: {
     alias: { "@ck/motion-hero": motion.hero, "@ck/motion-bg": motion.bg },

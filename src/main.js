@@ -57,7 +57,7 @@ if (tier !== "static") {
 }
 
 // ---------- Motion layer ----------
-// __CK_MOTION__ is "external" (3D engineer's modules under /workspace/cyberking/motion/src, which do their own tiering,
+// __CK_MOTION__ is "external" (3D engineer's modules vendored under vendor/motion/src, which do their own tiering,
 // deferral, 2D fallback and reduced-motion no-op) or "standin" (this repo's src/motion/standin/*).
 const MOTION_KIND = typeof __CK_MOTION__ !== "undefined" ? __CK_MOTION__ : "standin";
 const idle = (fn) => ("requestIdleCallback" in window ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 200));
@@ -308,7 +308,7 @@ async function initHeroVideoInner() {
   const video = document.getElementById("heroVideo");
   if (!video || tier !== "full" || /[?&]video=0/.test(location.search)) return; // reduced motion: poster only, never autoplay
   let man;
-  try { const r = await fetch("/motion/video/video-manifest.json", { cache: "no-store" }); if (!r.ok) return; man = await r.json(); } catch (_) { return; }
+  try { const r = await fetch(import.meta.env.BASE_URL + "motion/video/video-manifest.json", { cache: "no-store" }); if (!r.ok) return; man = await r.json(); } catch (_) { return; }
   if (!man.videos || !man.videos.length) return;
   const portrait = isPhone; // same rule as motion/video-snippet.html: ≤900px (or portrait) → mobile cut
   const saveData = navigator.connection && navigator.connection.saveData;
