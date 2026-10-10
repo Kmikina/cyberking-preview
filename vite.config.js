@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 const EXT = path.resolve(__dirname, "../motion");
 const VIDEO_DIR = path.resolve(EXT, "video");
@@ -25,9 +26,20 @@ function heroVideo() {
       res: /2160|4k|uhd/.test(n) ? 2160 : /1440/.test(n) ? 1440 : /1080|fhd/.test(n) ? 1080 : /720/.test(n) ? 720 : 1080,
     };
   };
+  // Mark bounds per clip (so the page can frame any re-render without hand-tuned numbers). Cached by mtime.
+  const cache = new Map();
+  const measure = (f) => {
+    const full = path.join(VIDEO_DIR, f), key = f + ":" + fs.statSync(full).mtimeMs;
+    if (!cache.has(key)) {
+      try { cache.set(key, JSON.parse(execFileSync("python3", [path.resolve(__dirname, "scripts/measure-mark.py"), full], { encoding: "utf8" }))); }
+      catch (e) { console.warn("[cyberking] could not measure", f, e.message); cache.set(key, null); }
+    }
+    return cache.get(key);
+  };
   const list = () => (fs.existsSync(VIDEO_DIR) ? fs.readdirSync(VIDEO_DIR).filter((f) => fs.statSync(path.join(VIDEO_DIR, f)).isFile()) : []);
   const manifest = () => {
     const files = list().map((f) => ({ src: "/motion/video/" + f, ...classify(f) })).filter((x) => x.kind);
+    files.forEach((x) => { if (x.kind === "video") { const m = measure(path.basename(x.src)); if (m) { x.size = [m.w, m.h]; x.mobile = x.mobile || m.h > m.w; x.markUnion = m.union; x.markF0 = m.f0; } } });
     return { generated: new Date().toISOString(), videos: files.filter((f) => f.kind === "video"), posters: files.filter((f) => f.kind === "poster") };
   };
   return {

@@ -3,7 +3,7 @@ export const LAYERS = [
   { id: "net", label: "Networks", note: "Design · implementation · integration" },
   { id: "dc", label: "Data centers", note: "Design · build · consolidation · migration" },
   { id: "app", label: "Applications", note: "System & application integration" },
-  { id: "av", label: "Conference & AV", note: "VTC · streaming · webcast" },
+  { id: "av", label: "Conference & AV", note: "Video teleconferencing · streaming" },
   { id: "c2", label: "Command & control", note: "Video walls · digital signage" },
   { id: "bld", label: "Building systems", note: "Wayfinding · room scheduling · emergency" },
 ];
@@ -69,7 +69,7 @@ export function buildStack(svg) {
 
     const lab = sv("g", { class: "plate-label" }, svg);
     sv("line", { x1: f(R[0] + 14), y1: f(y), x2: f(R[0] + 54), y2: f(y) }, lab);
-    const t1 = sv("text", { x: f(R[0] + 64), y: f(y - 3), class: "lbl-main" }, lab); t1.textContent = layer.label.toUpperCase();
+    const t1 = sv("text", { x: f(R[0] + 64), y: f(y - 3), class: "lbl-main" }, lab); t1.textContent = layer.label;
     const t2 = sv("text", { x: f(R[0] + 64), y: f(y + 15) }, lab); t2.textContent = layer.note;
     labels.push(lab);
   });

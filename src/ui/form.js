@@ -9,14 +9,18 @@ export function initForm() {
 
   function check(input) {
     const v = input.value.trim();
-    const ok = input.type === "email" ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) : v.length > 0;
+    const ok = input.type === "email" ? /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) : v.length > 0;
     const field = input.closest(".field2");
     if (field) field.classList.toggle("is-invalid", !ok);
     input.setAttribute("aria-invalid", String(!ok));
     return ok;
   }
+  const noteEl = document.getElementById("briefNote");
+  const noteText = noteEl ? noteEl.textContent : "";
   form.addEventListener("input", (e) => {
     if (e.target.closest && e.target.closest(".field2.is-invalid")) check(e.target);
+    setStatus("Drafting");
+    if (noteEl && noteEl.textContent !== noteText && !form.querySelector(".is-invalid")) noteEl.textContent = noteText;
   });
   required.forEach((input) => input.addEventListener("blur", () => { if (input.value.trim()) check(input); }));
 
@@ -47,7 +51,7 @@ export function initForm() {
     const href = "mailto:info@cyberkingservices.com?subject=" + encodeURIComponent("Project brief — " + (org || name)) +
       "&body=" + encodeURIComponent(lines.join("\r\n"));
     setStatus("Opening email");
-    if (note) note.textContent = "Your email app should open with the draft. If it doesn't, email info@cyberkingservices.com or call (571) 388-0486.";
+    if (note) note.textContent = "Your email app should now open with the draft. If it didn't, email info@cyberkingservices.com directly.";
     window.location.href = href;
     clearTimeout(resetTimer);
     resetTimer = setTimeout(() => setStatus("Ready"), 6000);

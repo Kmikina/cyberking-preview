@@ -22,7 +22,7 @@ import { initUI } from "./ui/ui.js";
 import { initRail } from "./ui/rail.js";
 import { buildStack } from "./ui/stack.js";
 import { initForm } from "./ui/form.js";
-import { CHAPTERS, chapterBus } from "./ui/chapters.js";
+import { CHAPTERS, LIGHT, chapterBus } from "./ui/chapters.js";
 
 const root = document.documentElement;
 let tier = root.dataset.tier || "full";
@@ -86,18 +86,11 @@ async function startStandin() {
   } catch (e) { return startLite(e.message); }
   try {
     const H = await import("./motion/hero.js");
-    const annots = [...document.querySelectorAll(".hero__annot")];
     hero = await H.init(heroCanvas, {
       dprCap: isMobile ? 1.5 : 2,
       quality: /[?&]quality=low/.test(location.search) || isMobile ? "low" : "high",
       onFirstFrame: () => heroEl.classList.add("gl-on"),
       onContextLost: () => startLite("hero context lost"),
-      onAnchors: (pts) => pts.forEach((p, i) => {
-        const el = annots[i];
-        if (!el) return;
-        el.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, 0) translate(${i === 1 ? "12px" : i === 0 ? "calc(-100% - 12px)" : "-50%"}, ${i === 2 ? "14px" : "-50%"})`;
-        el.classList.toggle("is-placed", p.visible);
-      }),
     });
     hero.setChapter(chapterBus.current);
     const onScroll = () => hero && hero.setProgress(heroProgress());
@@ -110,22 +103,117 @@ async function startStandin() {
 }
 
 /**
- * Hero composition for the external scene. Must stay in sync with the .ckm-poster__mark overrides in main.css so
- * the first WebGL frame lands on the poster. Desktop: mark sits right of the copy column inside the 90rem wrap.
- * Mobile (≤900px): the motion package's default (centred, top).
+ * Hero composition. One measured box drives everything so the mark never crosses the copy column:
+ *   - M (the "mark zone") sits between the right edge of the hero copy and the right gutter, above the stat strip.
+ *   - The rendered video is scaled/positioned so the union of the mark across the whole loop fills M.
+ *   - The live scene's first frame (layout.focus0/markPx) and the SVG poster land on the video's frame 0.
+ *   - The C / I / A labels are anchored to M's corners (as on the original site: top-left, top-right, bottom).
+ * Video mark bounds, measured from hero-loop-1920x1080 (normalised to the frame): see VIDEO_U / VIDEO_F0.
  */
-function heroLayout(w, h) {
+// Mark bounds inside the clip (0..1 of the frame). Defaults = hero-loop-1920x1080 v1; the build measures every clip and
+// writes markUnion/markF0 into video-manifest.json, which replaces these once the manifest is read (setVideoMeta).
+let VMETA = { union: [0.462, 0.133, 0.91, 0.889], f0: [0.512, 0.152, 0.883, 0.785], size: [1920, 1080] };
+let VMETA_MOBILE = null; // only set when a portrait cut exists
+function setVideoMeta(v) {
+  if (!v || !v.markUnion || !v.markF0) return;
+  const m = { union: v.markUnion, f0: v.markF0, size: v.size || [1920, 1080] };
+  if (v.mobile) VMETA_MOBILE = m; else VMETA = m;
+}
+const stageEl = heroEl.querySelector(".hero__stage");
+let lastBox = null;
+
+function textRight() {
+  const st = stageEl.getBoundingClientRect();
+  let r = 0;
+  heroEl.querySelectorAll(".hero__eyebrow, .hero__title, .hero__lede, .hero__actions").forEach((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    for (const q of range.getClientRects()) if (q.width > 0) r = Math.max(r, q.right - st.left);
+  });
+  return r;
+}
+
+/** Fit the clip so the union of the mark fills zone (x0..x1, y0..y1); return video rect + frame-0 mark. */
+function frameVideo(meta, x0, x1, y0, y1, maxW) {
+  const [u0, v0, u1, v1] = meta.union, [fw, fh] = meta.size;
+  const uAspect = ((u1 - u0) * fw) / ((v1 - v0) * fh);
+  const Mw = Math.max(80, Math.min(x1 - x0, (y1 - y0) * uAspect, maxW));
+  const Mh = Mw / uAspect;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const Vw = Mw / (u1 - u0), Vh = (Vw * fh) / fw;
+  const vx = cx - ((u0 + u1) / 2) * Vw, vy = cy - ((v0 + v1) / 2) * Vh;
+  const f = meta.f0;
+  return {
+    M: { x: cx - Mw / 2, y: cy - Mh / 2, w: Mw, h: Mh },
+    V: { x: vx, y: vy, w: Vw, h: Vh },
+    markPx: (f[2] - f[0]) * Vw,
+    cx: vx + ((f[0] + f[2]) / 2) * Vw,
+    cy: vy + ((f[1] + f[3]) / 2) * Vh,
+  };
+}
+
+function computeBox(w, h) {
   if (w <= 900) {
-    const mw = Math.min(0.76 * w, 440);
-    return { markPx: mw, focus0: [0.5, (64 + 28 + (mw * 180) / 186 / 2) / h], focus1: [0.5, 0.33], frac: 0.92 };
+    const mw = Math.min(0.76 * w, 440), mh = (mw * 180) / 186;
+    if (VMETA_MOBILE && h > w) {
+      // Portrait cut: union of the mark fills the slot above the eyebrow.
+      const st = stageEl.getBoundingClientRect();
+      const eb = heroEl.querySelector(".hero__eyebrow");
+      const yMax = (eb ? eb.getBoundingClientRect().top - st.top : 92 + mh) - 34;
+      const fr = frameVideo(VMETA_MOBILE, (w - mw) / 2, (w + mw) / 2, 92, Math.max(92 + mh * 0.6, yMax), mw);
+      return { mobile: true, w, h, ...fr };
+    }
+    // Mobile without a portrait cut: the motion package default (mark centred above the copy).
+    const cy = 64 + 28 + mh / 2;
+    return { mobile: true, w, h, markPx: mw, cx: w / 2, cy, M: { x: w / 2 - mw / 2, y: cy - mh / 2, w: mw, h: mh } };
   }
-  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  const gutter = Math.min(Math.max(rem, 0.04 * w), 3.5 * rem);
-  const mw = Math.min(0.3 * w, 0.55 * h);
-  const right = Math.max(gutter, (w - 90 * rem) / 2 + 0.02 * w);
-  const cx = w - right - mw / 2;
-  const cy = 0.5 * h - 0.04 * ((mw * 180) / 186);
-  return { markPx: mw, focus0: [cx / w, cy / h], focus1: [Math.min(cx / w, 0.68), 0.52], frac: 0.46 };
+  const st = stageEl.getBoundingClientRect();
+  const nav = document.getElementById("nav");
+  const strip = heroEl.querySelector(".hero__strip");
+  const x0 = textRight() + Math.max(40, 0.03 * w);
+  const x1 = w - Math.max(56, 0.05 * w);
+  const y0 = (nav ? nav.offsetHeight : 72) + 44; // room for the C / I labels
+  const stripTop = strip ? strip.getBoundingClientRect().top - st.top : h - 96;
+  const y1 = Math.min(h, stripTop) - 40; // room for the A label
+  return { mobile: false, w, h, zone: { x0, x1 }, ...frameVideo(VMETA, x0, x1, y0, y1, 0.92 * h) };
+}
+
+function applyBox(b) {
+  lastBox = b;
+  const s = heroEl.style;
+  s.setProperty("--mk-w", b.markPx.toFixed(1) + "px");
+  s.setProperty("--mk-x", (b.cx - b.markPx / 2).toFixed(1) + "px");
+  s.setProperty("--mk-cy", b.cy.toFixed(1) + "px");
+  s.setProperty("--mb-x", b.M.x.toFixed(1) + "px");
+  s.setProperty("--mb-y", b.M.y.toFixed(1) + "px");
+  s.setProperty("--mb-w", b.M.w.toFixed(1) + "px");
+  s.setProperty("--mb-h", b.M.h.toFixed(1) + "px");
+  if (b.V) {
+    s.setProperty("--v-x", b.V.x.toFixed(1) + "px");
+    s.setProperty("--v-y", b.V.y.toFixed(1) + "px");
+    s.setProperty("--v-w", b.V.w.toFixed(1) + "px");
+    s.setProperty("--v-h", b.V.h.toFixed(1) + "px");
+  }
+  heroEl.classList.add("has-layout");
+  heroEl.classList.toggle("is-mobile-layout", b.mobile);
+  heroEl.classList.toggle("has-vframe", !!b.V);
+}
+
+function relayout() {
+  const r = stageEl.getBoundingClientRect();
+  applyBox(computeBox(r.width, r.height));
+}
+relayout();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { relayout(); if (hero && hero.resize) hero.resize(); });
+let rlT = 0;
+addEventListener("resize", () => { cancelAnimationFrame(rlT); rlT = requestAnimationFrame(relayout); });
+
+function heroLayout(w, h) {
+  const b = lastBox && Math.abs(lastBox.w - w) < 2 && Math.abs(lastBox.h - h) < 2 ? lastBox : computeBox(w, h);
+  if (b.mobile) return { markPx: b.markPx, focus0: [b.cx / w, b.cy / h], focus1: [0.5, 0.33], frac: 0.92 };
+  // Risen fortress stays inside the same right-hand zone, so it never crosses the copy while the copy is visible.
+  const zx = (b.zone.x0 + b.zone.x1) / 2;
+  return { markPx: b.markPx, focus0: [b.cx / w, b.cy / h], focus1: [zx / w, 0.5], frac: Math.min(0.46, ((b.zone.x1 - b.zone.x0) / w) * 0.95) };
 }
 
 async function startExternal() {
@@ -135,6 +223,7 @@ async function startExternal() {
   bg = B.init(bgCanvas, { initialChapter: chapterBus.current });
   bg.kind = "external";
   bgCanvas.classList.add("is-on");
+  root.classList.add("bg-live");
   hero = H.init(document.getElementById("heroCanvas"), {
     poster: document.getElementById("heroPoster"),
     trigger: heroEl,
@@ -151,7 +240,7 @@ async function startExternal() {
 // ---------- Hero video slot (renders from the motion engineer, if delivered) ----------
 async function initHeroVideo() {
   const video = document.getElementById("heroVideo");
-  if (!video || tier !== "full") return; // reduced motion: poster only, never autoplay
+  if (!video || tier !== "full" || /[?&]video=0/.test(location.search)) return; // reduced motion: poster only, never autoplay
   let man;
   try { const r = await fetch("/motion/video/video-manifest.json", { cache: "no-store" }); if (!r.ok) return; man = await r.json(); } catch (_) { return; }
   if (!man.videos || !man.videos.length) return;
@@ -167,6 +256,9 @@ async function initHeroVideo() {
   if (poster) video.poster = poster;
   // Prefer the closest resolution; offer webm + mp4 of that resolution.
   const best = pool.filter((v) => v.res === pool[0].res);
+  setVideoMeta(best.find((v) => v.markUnion) || best[0]);
+  relayout();
+  if (hero && hero.resize) hero.resize();
   best.forEach((v) => { const so = document.createElement("source"); so.src = v.src; so.type = v.type; video.appendChild(so); });
   video.hidden = false;
   if (saveData) { heroEl.classList.add("video-on"); return; } // poster frame only
@@ -185,6 +277,7 @@ async function initHeroVideo() {
 }
 
 chapterBus.on((id) => {
+  root.classList.toggle("bg-paper", LIGHT.has(id));
   if (bg) bg.setChapter(id);
   if (hero) hero.setChapter(id);
 });

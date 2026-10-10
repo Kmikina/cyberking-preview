@@ -10,15 +10,10 @@ function splitWords(el, keyWords = []) {
   const text = el.textContent.trim();
   const words = text.split(/\s+/);
   el.innerHTML = "";
-  // a11y: aria-label is prohibited on <p>; keep the sentence readable as one string via a visually-hidden copy.
-  const sr = document.createElement("span");
-  sr.textContent = text;
-  sr.style.cssText = "position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0";
-  el.appendChild(sr);
+  // Same as the original: plain word spans in reading order (no duplicate screen-reader copy).
   return words.map((w, i) => {
     const s = document.createElement("span");
     s.className = "w" + (keyWords.some((k) => w.toLowerCase().startsWith(k)) ? " key" : "");
-    s.setAttribute("aria-hidden", "true");
     s.textContent = w;
     el.appendChild(s);
     if (i < words.length - 1) el.appendChild(document.createTextNode(" "));
