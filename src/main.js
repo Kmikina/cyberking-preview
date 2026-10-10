@@ -122,6 +122,13 @@ function setVideoMeta(v) {
 const stageEl = heroEl.querySelector(".hero__stage");
 let lastBox = null;
 
+// Layout position without the intro's CSS translate, so a measurement mid-animation equals the settled one.
+function untransformedTop(el, st) {
+  const t = getComputedStyle(el).transform;
+  const dy = t && t !== "none" ? new DOMMatrixReadOnly(t).m42 : 0;
+  return el.getBoundingClientRect().top - dy - st.top;
+}
+
 function textRight() {
   const st = stageEl.getBoundingClientRect();
   let r = 0;
@@ -159,7 +166,7 @@ function computeBox(w, h) {
       // Portrait cut: union of the mark fills the slot above the eyebrow.
       const st = stageEl.getBoundingClientRect();
       const eb = heroEl.querySelector(".hero__eyebrow");
-      const yMax = (eb ? eb.getBoundingClientRect().top - st.top : 92 + mh) - 34;
+      const yMax = (eb ? untransformedTop(eb, st) : 92 + mh) - 34;
       const fr = frameVideo(VMETA_MOBILE, (w - mw) / 2, (w + mw) / 2, 92, Math.max(92 + mh * 0.6, yMax), mw);
       // Phones: keep the cut full-bleed horizontally (no side fades), shifting the whole composition if needed.
       const dx = fr.V.w >= w ? Math.min(0, Math.max(w - fr.V.w, fr.V.x)) - fr.V.x : (w - fr.V.w) / 2 - fr.V.x;
@@ -176,7 +183,7 @@ function computeBox(w, h) {
   const x0 = textRight() + Math.max(40, 0.03 * w);
   const x1 = w - Math.max(56, 0.05 * w);
   const y0 = (nav ? nav.offsetHeight : 72) + 44; // room for the C / I labels
-  const stripTop = strip ? strip.getBoundingClientRect().top - st.top : h - 96;
+  const stripTop = strip ? untransformedTop(strip, st) : h - 96;
   const y1 = Math.min(h, stripTop) - 40; // room for the A label
   // Preferred: the clip full-bleed (object-fit: cover), if its mark already stays clear of the copy column.
   {
@@ -212,13 +219,16 @@ function applyBox(b) {
     s.setProperty("--v-h", b.V.h.toFixed(1) + "px");
   }
   heroEl.classList.add("has-layout");
+
   heroEl.classList.toggle("is-mobile-layout", b.mobile);
   heroEl.classList.toggle("has-vframe", !!b.V);
   heroEl.classList.toggle("v-cover", !!b.cover);
   heroEl.classList.toggle("annot-side", !!b.cover && b.M.y + b.M.h > b.h - 64);
 }
 
+const layoutMemo = new Map();
 function relayout() {
+  layoutMemo.clear();
   const r = stageEl.getBoundingClientRect();
   applyBox(computeBox(r.width, r.height));
 }
@@ -233,7 +243,10 @@ addEventListener("resize", () => { cancelAnimationFrame(rlT); rlT = requestAnima
 
 function heroLayout(w, h) {
   if (!lastBox) relayout();
-  const b = lastBox && Math.abs(lastBox.w - w) < 2 && Math.abs(lastBox.h - h) < 2 ? lastBox : computeBox(w, h);
+  // The motion module may call layout() often; never force DOM measurement more than once per size.
+  const key = Math.round(w) + "x" + Math.round(h);
+  let b = lastBox && Math.abs(lastBox.w - w) < 2 && Math.abs(lastBox.h - h) < 2 ? lastBox : layoutMemo.get(key);
+  if (!b) { b = computeBox(w, h); layoutMemo.set(key, b); }
   if (b.mobile) return { markPx: b.markPx, focus0: [b.cx / w, b.cy / h], focus1: [0.5, 0.33], frac: 0.92 };
   // Risen fortress stays inside the same right-hand zone, so it never crosses the copy while the copy is visible.
   const zx = (b.zone.x0 + b.zone.x1) / 2;
@@ -262,36 +275,11 @@ async function startExternal() {
 }
 
 // ---------- Hero video slot (renders from the motion engineer, if delivered) ----------
-/**
- * Phones: paint the portrait cut through a <canvas> (same box, same fades) and keep the <video> element itself as a
- * tiny, near-transparent decoder. Reason: Chrome counts a playing <video> as an LCP candidate, so a clip that fades in
- * at ~2-4 s on a throttled phone would replace the hero text (already painted at ~1-2 s) as the LCP element even though
- * the SVG poster showing the same frame was there from first paint. Desktop keeps the plain <video>.
- */
-function blitToCanvas(video) {
-  const cv = document.createElement("canvas");
-  cv.className = "hero__video hero__video--canvas";
-  cv.setAttribute("aria-hidden", "true");
-  video.after(cv);
-  video.classList.add("hero__video--decoder");
-  const ctx = cv.getContext("2d", { alpha: false });
-  const size = () => {
-    const r = cv.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 1.5);
-    cv.width = Math.max(2, Math.round(r.width * d)); cv.height = Math.max(2, Math.round(r.height * d));
-  };
-  size();
-  addEventListener("resize", size);
-  let raf = 0, lastT = -1;
-  const draw = () => {
-    raf = 0;
-    if (video.readyState >= 2 && video.currentTime !== lastT) { lastT = video.currentTime; ctx.drawImage(video, 0, 0, cv.width, cv.height); }
-    if (!video.paused) raf = requestAnimationFrame(draw);
-  };
-  video.addEventListener("play", () => { if (!raf) raf = requestAnimationFrame(draw); });
-  video.addEventListener("seeked", () => { if (!raf) raf = requestAnimationFrame(draw); });
-}
-
+// Labels appear only once the layout has settled (fonts + clip metadata), so they never visibly jump (CLS).
 async function initHeroVideo() {
+  try { await initHeroVideoInner(); } finally { setTimeout(() => heroEl.classList.add("annots-on"), 200); }
+}
+async function initHeroVideoInner() {
   const video = document.getElementById("heroVideo");
   if (!video || tier !== "full" || /[?&]video=0/.test(location.search)) return; // reduced motion: poster only, never autoplay
   let man;
@@ -322,13 +310,19 @@ async function initHeroVideo() {
   video.hidden = false;
   if (saveData) { video.hidden = true; return; } // save-data: keep the SVG poster + live scene, no download
   video.preload = "auto";
-  if (portrait) blitToCanvas(video);
-  video.addEventListener("playing", () => heroEl.classList.add("video-on"), { once: true });
+  const syncScene = () => {
+    // The live scene is invisible under the playing clip: pause it to save CPU/GPU; resume for the crossfade.
+    if (!hero) return;
+    const showing = heroEl.classList.contains("video-on") && !heroEl.classList.contains("is-live");
+    try { showing ? hero.pause && hero.pause() : hero.resume && hero.resume(); } catch (_) {}
+  };
+  video.addEventListener("playing", () => { heroEl.classList.add("video-on"); syncScene(); }, { once: true });
   video.play().catch(() => {}); // autoplay refused: stay on the SVG poster / live scene
   // Crossfade into the live scroll scene as soon as scrolling starts; return to the film at the very top.
   const onScroll = () => {
     const live = scrollY > 24;
     heroEl.classList.toggle("is-live", live);
+    syncScene();
     if (live && !video.paused) video.pause();
     else if (!live && video.paused && !saveData) video.play().catch(() => {});
   };

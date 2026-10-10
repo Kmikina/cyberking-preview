@@ -39,6 +39,7 @@ function heroVideo() {
   const list = () => (fs.existsSync(VIDEO_DIR) ? fs.readdirSync(VIDEO_DIR).filter((f) => fs.statSync(path.join(VIDEO_DIR, f)).isFile()) : []);
   const manifest = () => {
     const files = list().map((f) => ({ src: "/motion/video/" + f, ...classify(f) })).filter((x) => x.kind);
+    for (let i = files.length - 1; i >= 0; i--) if (files[i].kind === "video" && !measure(path.basename(files[i].src))) { console.warn("[cyberking] skipping unreadable clip", files[i].src); files.splice(i, 1); }
     files.forEach((x) => { if (x.kind === "video") { const m = measure(path.basename(x.src)); if (m) { x.size = [m.w, m.h]; x.mobile = x.mobile || m.h > m.w; x.markUnion = m.union; x.markF0 = m.f0; } } });
     return { generated: new Date().toISOString(), videos: files.filter((f) => f.kind === "video"), posters: files.filter((f) => f.kind === "poster") };
   };
@@ -55,8 +56,9 @@ function heroVideo() {
       });
     },
     generateBundle() {
+      const keep = new Set(manifest().videos.concat(manifest().posters).map((x) => path.basename(x.src)));
       for (const f of list()) {
-        if (!classify(f)) continue;
+        if (!classify(f) || !keep.has(f)) continue;
         this.emitFile({ type: "asset", fileName: "motion/video/" + f, source: fs.readFileSync(path.join(VIDEO_DIR, f)) });
       }
       this.emitFile({ type: "asset", fileName: "motion/video/video-manifest.json", source: JSON.stringify(manifest(), null, 2) });
