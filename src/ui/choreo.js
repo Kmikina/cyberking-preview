@@ -74,7 +74,7 @@ export function initChoreo({ tier, isMobile }) {
 
   // ---------- 03 Challenge: statement lights word by word ----------
   const words = splitWords(document.getElementById("statement"), ["seams"]);
-  gsap.to(words, { opacity: 1, stagger: 0.08, ease: "none", scrollTrigger: { trigger: "#statement", start: "top 80%", end: "bottom 45%", scrub: true } });
+  gsap.fromTo(words, { opacity: (i, el) => (el.classList.contains("key") ? 0.75 : 0.42) }, { opacity: 1, stagger: 0.08, ease: "none", scrollTrigger: { trigger: "#statement", start: "top 80%", end: "bottom 45%", scrub: true } });
   gsap.utils.toArray(".triad__item").forEach((item, i) => {
     gsap.from(item, { y: 60, opacity: 0, duration: 1.1, delay: i * 0.12, ease: "power3.out", scrollTrigger: { trigger: ".triad", start: "top 85%" } });
     gsap.to(item, { "--w": "100%", duration: 1.2, delay: 0.2 + i * 0.12, ease: "power3.inOut", scrollTrigger: { trigger: ".triad", start: "top 85%" } });
@@ -152,7 +152,7 @@ export function initChoreo({ tier, isMobile }) {
 
   // ---------- 07 Commitment: the quote resolves word by word ----------
   const qWords = splitWords(document.getElementById("quote"));
-  gsap.fromTo(qWords, { opacity: 0.14 }, { opacity: 1, stagger: 0.05, ease: "none", scrollTrigger: { trigger: "#quote", start: "top 80%", end: "bottom 50%", scrub: true } });
+  gsap.fromTo(qWords, { opacity: 0.5 }, { opacity: 1, stagger: 0.05, ease: "none", scrollTrigger: { trigger: "#quote", start: "top 80%", end: "bottom 50%", scrub: true } });
 
   // ---------- 08 Contact: outline title fills ----------
   gsap.fromTo(".contact__outline", { backgroundPosition: "100% 0" }, { backgroundPosition: "0% 0", ease: "none", scrollTrigger: { trigger: ".contact__title", start: "top 85%", end: "bottom 45%", scrub: true } });
@@ -170,7 +170,6 @@ export function initChoreo({ tier, isMobile }) {
   });
 
   ScrollTrigger.sort();
-  ScrollTrigger.refresh();
 
   // Fonts can shift layout: refresh once they settle.
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => ScrollTrigger.refresh());

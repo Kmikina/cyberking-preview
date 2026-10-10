@@ -16,6 +16,7 @@ import "@fontsource/ibm-plex-mono/latin-500.css";
 import "./styles/fonts.css";
 import "./styles/poster.css";
 import "./styles/main.css";
+import "./a11y/reduced-motion-guard.js"; // live reduced-motion switch (perf/a11y)
 
 import { initUI } from "./ui/ui.js";
 import { initRail } from "./ui/rail.js";
@@ -34,7 +35,10 @@ initRail(document.getElementById("rail"));
 
 // ---------- Choreography (GSAP) ----------
 if (tier !== "static") {
-  import("./ui/choreo.js").then((m) => m.initChoreo({ tier, isMobile }));
+  // Choreography is below-the-fold work: wire it after load + idle so it stays out of the LCP/TBT window.
+  const startChoreo = () => import("./ui/choreo.js").then((m) => m.initChoreo({ tier, isMobile }));
+  if (document.readyState === "complete") ("requestIdleCallback" in window ? requestIdleCallback(startChoreo, { timeout: 800 }) : setTimeout(startChoreo, 0));
+  else addEventListener("load", () => ("requestIdleCallback" in window ? requestIdleCallback(startChoreo, { timeout: 800 }) : setTimeout(startChoreo, 0)), { once: true });
 } else {
   // Static: chapter tracking without scroll scrubbing.
   import("./ui/chapters-static.js").then((m) => m.trackChapters());
@@ -147,7 +151,7 @@ async function startExternal() {
 // ---------- Hero video slot (renders from the motion engineer, if delivered) ----------
 async function initHeroVideo() {
   const video = document.getElementById("heroVideo");
-  if (!video || tier === "static") return; // reduced motion: poster only, never autoplay
+  if (!video || tier !== "full") return; // reduced motion: poster only, never autoplay
   let man;
   try { const r = await fetch("/motion/video/video-manifest.json", { cache: "no-store" }); if (!r.ok) return; man = await r.json(); } catch (_) { return; }
   if (!man.videos || !man.videos.length) return;
@@ -155,6 +159,8 @@ async function initHeroVideo() {
   const saveData = navigator.connection && navigator.connection.saveData;
   const want = portrait ? 0 : innerWidth * Math.min(devicePixelRatio || 1, 2) > 2400 ? 2160 : 1080;
   let pool = man.videos.filter((v) => v.mobile === portrait);
+  // No portrait encode yet: don't ship a 10 MB landscape film to phones; the live scene covers the hero.
+  if (!pool.length && portrait) return;
   if (!pool.length) pool = man.videos;
   pool.sort((a, b) => Math.abs(a.res - want) - Math.abs(b.res - want) || (a.type === "video/webm" ? -1 : 1));
   const poster = (man.posters.find((p) => p.mobile === portrait) || man.posters[0] || {}).src;
