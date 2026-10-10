@@ -1,0 +1,1 @@
+var e={ink:`#07090d`,ink2:`#0b0f16`,graphite:`#111620`,graphite2:`#171d29`,sideL:`#0c1018`,sideR:`#0e131c`,line:[160,174,196],mute:`#7d8798`,mute2:`#a3acba`,soft:`#e9edf2`,white:`#f6f8fa`,red:`#e92830`,cyan:`#1aaae4`,paper:`#eceef1`,paperInk:`#0b0f16`};export{e as t};

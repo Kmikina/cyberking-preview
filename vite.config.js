@@ -62,6 +62,11 @@ export default defineConfig({
   },
   server: { fs: { allow: [__dirname, EXT] } },
   plugins: [heroVideo()],
-  build: { target: "es2020", chunkSizeWarningLimit: 700, modulePreload: { polyfill: false } },
+  build: {
+    target: "es2020", chunkSizeWarningLimit: 700, modulePreload: { polyfill: false },
+    // perf/caching: keep three + gsap in stable vendor chunks (otherwise three gets merged into a motion-core chunk
+    // whose hash changes on every motion edit). Same split the motion demo uses.
+    rollupOptions: { output: { manualChunks: (id) => (id.includes("node_modules/three") ? "three" : id.includes("node_modules/gsap") ? "gsap" : undefined) } },
+  },
   preview: { host: "127.0.0.1", port: 4173, strictPort: true },
 });

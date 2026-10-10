@@ -180,6 +180,10 @@ h2 { font-family: var(--f-display); font-weight: 500; letter-spacing: -.02em; }
 .hero__stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; z-index: 0; }
 .hero__fg { position: absolute; inset: 0 0 auto; min-height: 100vh; min-height: 100svh; display: grid; grid-template-rows: 1fr auto; z-index: 3; }
 .ckm-poster { z-index: 0; }
+/* Poster mark placement: keep in sync with heroLayout() in main.js */
+@container (min-width: 901px) {
+  .ckm-poster__mark { width: min(30cqw, 55cqh); right: max(clamp(1rem, 4cqw, 3.5rem), calc((100cqw - 90rem) / 2 + 2cqw)); top: 50%; transform: translateY(-54%); }
+}
 .hero__gl, .hero__video { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero__gl { z-index: 1; opacity: 0; transition: opacity 1.4s var(--ease); }
 .hero__video { z-index: 2; object-fit: cover; opacity: 0; transition: opacity 1.1s var(--ease); background: transparent; }
@@ -210,7 +214,7 @@ h2 { font-family: var(--f-display); font-weight: 500; letter-spacing: -.02em; }
 .hero__eyebrow { margin-bottom: clamp(1.5rem, 3.4vh, 2.5rem); }
 .hero__title {
   font-family: var(--f-display); font-stretch: 106%; font-weight: 500;
-  font-size: clamp(3rem, 8.2vw, 9rem); line-height: .92; letter-spacing: -.045em; color: var(--white); max-width: 11ch;
+  font-size: clamp(3rem, 7vw, 8rem); line-height: .92; letter-spacing: -.045em; color: var(--white); max-width: 11ch;
 }
 .hero__title .line { display: block; overflow: hidden; padding-bottom: .08em; margin-bottom: -.08em; }
 .hero__title .line > span { display: inline-block; }

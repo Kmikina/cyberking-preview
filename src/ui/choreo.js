@@ -29,7 +29,7 @@ function splitWords(el, keyWords = []) {
 export function initChoreo({ tier, isMobile }) {
   // ---------- 01 Hero: copy drifts up and dims as the citadel lifts ----------
   gsap.to(".hero__content", { yPercent: -14, opacity: 0, ease: "none", scrollTrigger: { trigger: "#top", start: "top top", end: "30% top", scrub: true } });
-  gsap.to(".hero__strip", { opacity: 0, ease: "none", scrollTrigger: { trigger: "#top", start: "2% top", end: "15% top", scrub: true } });
+  gsap.fromTo(".hero__strip", { opacity: 1 }, { opacity: 0, immediateRender: false, ease: "none", scrollTrigger: { trigger: "#top", start: "2% top", end: "15% top", scrub: true } });
 
   // ---------- 02 Environment: pinned stack assembly ----------
   const stack = document.getElementById("stack")._stack;

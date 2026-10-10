@@ -105,6 +105,25 @@ async function startStandin() {
   }
 }
 
+/**
+ * Hero composition for the external scene. Must stay in sync with the .ckm-poster__mark overrides in main.css so
+ * the first WebGL frame lands on the poster. Desktop: mark sits right of the copy column inside the 90rem wrap.
+ * Mobile (≤900px): the motion package's default (centred, top).
+ */
+function heroLayout(w, h) {
+  if (w <= 900) {
+    const mw = Math.min(0.76 * w, 440);
+    return { markPx: mw, focus0: [0.5, (64 + 28 + (mw * 180) / 186 / 2) / h], focus1: [0.5, 0.33], frac: 0.92 };
+  }
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const gutter = Math.min(Math.max(rem, 0.04 * w), 3.5 * rem);
+  const mw = Math.min(0.3 * w, 0.55 * h);
+  const right = Math.max(gutter, (w - 90 * rem) / 2 + 0.02 * w);
+  const cx = w - right - mw / 2;
+  const cy = 0.5 * h - 0.04 * ((mw * 180) / 186);
+  return { markPx: mw, focus0: [cx / w, cy / h], focus1: [Math.min(cx / w, 0.68), 0.52], frac: 0.46 };
+}
+
 async function startExternal() {
   // Their init() is synchronous and defers its own heavy loading until after first paint + idle.
   const [H, B] = await Promise.all([import("./motion/hero.js"), import("./motion/background.js")]);
@@ -117,6 +136,7 @@ async function startExternal() {
     trigger: heroEl,
     scrollStart: "top top",
     scrollEnd: "bottom bottom",
+    layout: heroLayout,
     onFirstFrame: () => heroEl.classList.add("gl-on"),
   });
   hero.setChapter(chapterBus.current);
