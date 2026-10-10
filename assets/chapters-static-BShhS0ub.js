@@ -1,0 +1,1 @@
+import{n as e,r as t}from"./index-BmKNFF9r.js";function n(){let n=new IntersectionObserver(e=>{e.forEach(e=>{e.isIntersecting&&t.set(e.target.id)})},{rootMargin:`-40% 0px -59% 0px`});e.forEach(e=>{let t=document.getElementById(e);t&&n.observe(t)})}export{n as trackChapters};

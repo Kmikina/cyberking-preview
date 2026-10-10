@@ -1,0 +1,175 @@
+{
+  "generated": "2026-10-10T20:52:11.850Z",
+  "videos": [
+    {
+      "src": "/cyberking-preview/motion/video/hero-loop-1920x1080-30fps-10s.mp4",
+      "kind": "video",
+      "type": "video/mp4",
+      "mobile": false,
+      "res": 1080,
+      "size": [
+        1920,
+        1080
+      ],
+      "markUnion": [
+        0.55,
+        0.2259,
+        0.8875,
+        0.9519
+      ],
+      "markF0": [
+        0.6021,
+        0.2296,
+        0.8792,
+        0.7
+      ]
+    },
+    {
+      "src": "/cyberking-preview/motion/video/hero-loop-1920x1080-30fps-10s.webm",
+      "kind": "video",
+      "type": "video/webm",
+      "mobile": false,
+      "res": 1080,
+      "size": [
+        1920,
+        1080
+      ],
+      "markUnion": [
+        0.55,
+        0.2259,
+        0.8875,
+        0.9519
+      ],
+      "markF0": [
+        0.6021,
+        0.2296,
+        0.8792,
+        0.7
+      ]
+    },
+    {
+      "src": "/cyberking-preview/motion/video/hero-loop-3840x2160-30fps-10s.mp4",
+      "kind": "video",
+      "type": "video/mp4",
+      "mobile": false,
+      "res": 2160,
+      "size": [
+        3840,
+        2160
+      ],
+      "markUnion": [
+        0.55,
+        0.2259,
+        0.8875,
+        0.9519
+      ],
+      "markF0": [
+        0.6021,
+        0.2296,
+        0.8792,
+        0.7
+      ]
+    },
+    {
+      "src": "/cyberking-preview/motion/video/hero-loop-3840x2160-30fps-10s.webm",
+      "kind": "video",
+      "type": "video/webm",
+      "mobile": false,
+      "res": 2160,
+      "size": [
+        3840,
+        2160
+      ],
+      "markUnion": [
+        0.55,
+        0.2259,
+        0.8875,
+        0.9519
+      ],
+      "markF0": [
+        0.6021,
+        0.2296,
+        0.8792,
+        0.7
+      ]
+    },
+    {
+      "src": "/cyberking-preview/motion/video/hero-loop-mobile-1080x1920-30fps-10s.mp4",
+      "kind": "video",
+      "type": "video/mp4",
+      "mobile": true,
+      "res": 1080,
+      "size": [
+        1080,
+        1920
+      ],
+      "markUnion": [
+        0.1556,
+        0.0417,
+        0.8333,
+        0.3667
+      ],
+      "markF0": [
+        0.2704,
+        0.0896,
+        0.7296,
+        0.3354
+      ]
+    },
+    {
+      "src": "/cyberking-preview/motion/video/hero-loop-mobile-1080x1920-30fps-10s.webm",
+      "kind": "video",
+      "type": "video/webm",
+      "mobile": true,
+      "res": 1080,
+      "size": [
+        1080,
+        1920
+      ],
+      "markUnion": [
+        0.1333,
+        0.0417,
+        0.8333,
+        0.3667
+      ],
+      "markF0": [
+        0.2704,
+        0.0896,
+        0.7296,
+        0.3354
+      ]
+    }
+  ],
+  "posters": [
+    {
+      "src": "/cyberking-preview/motion/video/hero-poster-1920x1080.avif",
+      "kind": "poster",
+      "mobile": false
+    },
+    {
+      "src": "/cyberking-preview/motion/video/hero-poster-1920x1080.jpg",
+      "kind": "poster",
+      "mobile": false
+    },
+    {
+      "src": "/cyberking-preview/motion/video/hero-poster-3840x2160.avif",
+      "kind": "poster",
+      "mobile": false
+    },
+    {
+      "src": "/cyberking-preview/motion/video/hero-poster-3840x2160.jpg",
+      "kind": "poster",
+      "mobile": false
+    },
+    {
+      "src": "/cyberking-preview/motion/video/hero-poster-mobile-1080x1920.avif",
+      "kind": "poster",
+      "mobile": true
+    },
+    {
+      "src": "/cyberking-preview/motion/video/hero-poster-mobile-1080x1920.jpg",
+      "kind": "poster",
+      "mobile": true
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+function e(e,t){if(e<=900){let n=Math.min(.5*e,300,.27*t),r=80+n*180/186/2;return{markPx:n,focus0:[.5,r/t],focus1:[.5,r/t+.01],frac:.88,box:[.06,72/t,.94,.34],latticeR:15,guideR:13}}return{markPx:Math.min(.34*e,560,.56*t),focus0:[.74,.47],focus1:[.745,.54],frac:.4,box:[.53,.1,.96,.92]}}export{e as t};
